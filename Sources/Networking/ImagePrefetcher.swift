@@ -102,7 +102,10 @@ public class ImagePrefetcher: CustomStringConvertible {
     private let pretchQueue = DispatchQueue(label: "com.onevcat.Kingfisher.ImagePrefetcher.pretchQueue")
     private static let requestingQueue = DispatchQueue(label: "com.onevcat.Kingfisher.ImagePrefetcher.requestingQueue")
 
-    private var finished: Bool {
+    public var isFetching: Bool {
+        return !tasks.isEmpty
+    }
+    public var finished: Bool {
         let totalFinished: Int = failedSources.count + skippedSources.count + completedSources.count
         return totalFinished == prefetchSources.count && tasks.isEmpty
     }
