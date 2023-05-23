@@ -102,9 +102,7 @@ public class ImagePrefetcher: CustomStringConvertible {
     private let pretchQueue = DispatchQueue(label: "com.onevcat.Kingfisher.ImagePrefetcher.pretchQueue")
     private static let requestingQueue = DispatchQueue(label: "com.onevcat.Kingfisher.ImagePrefetcher.requestingQueue")
 
-    public var isFetching: Bool {
-        return !tasks.isEmpty
-    }
+    public var isFetching: Bool = false
     public var finished: Bool {
         let totalFinished: Int = failedSources.count + skippedSources.count + completedSources.count
         return totalFinished == prefetchSources.count && tasks.isEmpty
@@ -280,7 +278,7 @@ public class ImagePrefetcher: CustomStringConvertible {
     public func start() {
         pretchQueue.async {
             guard !self.stopped else {
- //               assertionFailure("You can not restart the same prefetcher. Try to create a new prefetcher.")
+                assertionFailure("You can not restart the same prefetcher. Try to create a new prefetcher.")
                 self.handleComplete()
                 return
             }
@@ -362,6 +360,7 @@ public class ImagePrefetcher: CustomStringConvertible {
     
     private func startPrefetching(_ source: Source)
     {
+        isFetching = true
         if optionsInfo.forceRefresh {
             downloadAndCache(source)
             return

@@ -1,10 +1,10 @@
 //
-//  LazyVStackDemo.swift
+//  SingleListDemo.swift
 //  Kingfisher
 //
-//  Created by onevcat on 2021/03/02.
+//  Created by onevcat on 2022/09/21.
 //
-//  Copyright (c) 2021 Wei Wang <onevcat@gmail.com>
+//  Copyright (c) 2022 Wei Wang <onevcat@gmail.com>
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -28,29 +28,24 @@ import SwiftUI
 import Kingfisher
 
 @available(iOS 14.0, *)
-struct LazyVStackDemo: View {
-    @State private var singleImage = false
-    
+struct Issue1998View: View {
     var body: some View {
-        ScrollView {
-            // Checking for #1839
-            Toggle("Single Image", isOn: $singleImage).padding()
-            LazyVStack {
-                ForEach(1..<700) { i in
-                    if singleImage {
-                        KFImage.url(ImageLoader.roseImage(index: 1))
-                    } else {
-                        ImageCell(index: i).frame(width: 300, height: 300)
-                    }
-                }
+        Text("This is a test case for #1988")
+        
+        List {
+            ForEach(1...100, id: \.self) { idx in
+                KFImage(ImageLoader.sampleImageURLs.first)
+                    .startLoadingBeforeViewAppear()
+                    .resizable()
+                    .frame(width: 48, height: 48)
             }
-        }.navigationBarTitle(Text("Lazy Stack"), displayMode: .inline)
+        }
     }
 }
 
 @available(iOS 14.0, *)
-struct LazyVStackDemo_Previews: PreviewProvider {
+struct SingleListDemo_Previews: PreviewProvider {
     static var previews: some View {
-        LazyVStackDemo()
+        Issue1998View()
     }
 }

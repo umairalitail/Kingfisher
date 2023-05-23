@@ -194,6 +194,22 @@ open class AnimatedImageView: UIImageView {
             }
         }
     }
+
+// Workaround for Apple xcframework creating issue on Apple TV in Swift 5.8.
+// https://github.com/apple/swift/issues/66015
+#if os(tvOS)
+    public override init(image: UIImage?, highlightedImage: UIImage?) {
+        super.init(image: image, highlightedImage: highlightedImage)
+    }
+    
+    required public init?(coder: NSCoder) {
+        super.init(coder: coder)
+    }
+    
+    init() {
+        super.init(frame: .zero)
+    }
+#endif
     
     deinit {
         if isDisplayLinkInitialized {
@@ -227,15 +243,7 @@ open class AnimatedImageView: UIImageView {
     }
     
     override open func display(_ layer: CALayer) {
-        if let currentFrame = animator?.currentFrameImage {
-            layer.contents = currentFrame.cgImage
-        } else {
-            if #available(iOS 15.0, *) {
-                super.display(layer)
-            } else {
-                layer.contents = image?.cgImage
-            }
-        }
+        layer.contents = animator?.currentFrameImage?.cgImage ?? image?.cgImage
     }
     
     override open func didMoveToWindow() {
@@ -480,6 +488,7 @@ extension AnimatedImageView {
         }
         
         deinit {
+            resetAnimatedFrames()
             GraphicsContext.end()
         }
 
@@ -552,14 +561,31 @@ extension AnimatedImageView {
             guard let cgImage = CGImageSourceCreateImageAtIndex(imageSource, index, options as CFDictionary?) else {
                 return nil
             }
-
-            let image = KFCrossPlatformImage(cgImage: cgImage)
             
-            guard let context = GraphicsContext.current(size: imageSize, scale: imageScale, inverting: true, cgImage: cgImage) else {
-                return image
+            if #available(iOS 15, tvOS 15, *) {
+                // From iOS 15, a plain image loading causes iOS calling `-[_UIImageCGImageContent initWithCGImage:scale:]`
+                // in ImageIO, which holds the image ref on the creating thread.
+                // To get a workaround, create another image ref and use that to create the final image. This leads to
+                // some performance loss, but there is little we can do.
+                // https://github.com/onevcat/Kingfisher/issues/1844
+                guard let context = GraphicsContext.current(size: imageSize, scale: imageScale, inverting: true, cgImage: cgImage),
+                      let decodedImageRef = cgImage.decoded(on: context, scale: imageScale)
+                else {
+                    return KFCrossPlatformImage(cgImage: cgImage)
+                }
+                
+                return KFCrossPlatformImage(cgImage: decodedImageRef)
+            } else {
+                let image = KFCrossPlatformImage(cgImage: cgImage)
+                if backgroundDecode {
+                    guard let context = GraphicsContext.current(size: imageSize, scale: imageScale, inverting: true, cgImage: cgImage) else {
+                        return image
+                    }
+                    return image.kf.decoded(on: context)
+                } else {
+                    return image
+                }
             }
-            
-            return backgroundDecode ? image.kf.decoded(on: context) : image
         }
         
         private func updatePreloadedFrames() {
@@ -567,7 +593,16 @@ extension AnimatedImageView {
                 return
             }
 
-            animatedFrames[previousFrameIndex] = animatedFrames[previousFrameIndex]?.placeholderFrame
+            let previousFrame = animatedFrames[previousFrameIndex]
+            animatedFrames[previousFrameIndex] = previousFrame?.placeholderFrame
+            // ensure the image dealloc in main thread
+            defer {
+                if let image = previousFrame?.image {
+                    DispatchQueue.main.async {
+                        _ = image
+                    }
+                }
+            }
 
             preloadIndexes(start: currentFrameIndex).forEach { index in
                 guard let currentAnimatedFrame = animatedFrames[index] else { return }
